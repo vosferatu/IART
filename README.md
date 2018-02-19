@@ -45,34 +45,34 @@ This dataset was used in several classifications tasks related to the challenge 
 
 Families:
 
-     - Bufonidae              68 
-     - Dendrobatidae         542 
-     - Hylidae              2165 
-     - Leptodactylidae      4420 
+     Bufonidae              68 
+     Dendrobatidae         542 
+     Hylidae              2165 
+     Leptodactylidae      4420 
 
 Genus:
 
-     - Adenomera          4150 
-     - Ameerega            542 
-     - Dendropsophus       310 
-     - Hypsiboas          1593 
-     - Leptodactylus       270 
-     - Osteocephalus       114 
-     - Rhinella             68 
-     - Scinax              148 
+     Adenomera          4150 
+     Ameerega            542 
+     Dendropsophus       310 
+     Hypsiboas          1593 
+     Leptodactylus       270 
+     Osteocephalus       114 
+     Rhinella             68 
+     Scinax              148 
 
 Species:
 
-     - AdenomeraAndre             672 
-     - AdenomeraHylaedact…       3478 
-     - Ameeregatrivittata         542 
-     - HylaMinuta                 310 
-     - HypsiboasCinerascens       472 
-     - HypsiboasCordobae         1121 
-     - LeptodactylusFuscus        270 
-     - OsteocephalusOopha…        114 
-     - Rhinellagranulosa           68 
-     - ScinaxRuber                148 
+     AdenomeraAndre             672 
+     AdenomeraHylaedactylus    3478 
+     Ameeregatrivittata         542 
+     HylaMinuta                 310 
+     HypsiboasCinerascens       472 
+     HypsiboasCordobae         1121 
+     LeptodactylusFuscus        270 
+     OsteocephalusOophagus      114 
+     Rhinellagranulosa           68 
+     ScinaxRuber                148 
 
 
 
@@ -81,6 +81,8 @@ Attribute Information:
 
 Mel-frequency cepstral coefficients (MFCCs) are coefficients that collectively make up an mel-frequency cepstrum (MFC). Due to each syllable has different length, every row (i) was normalized acording to MFCCs_i/(max(abs(MFCCs_i))).
 
+
+***
 
 Relevant Papers:
 
