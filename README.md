@@ -86,7 +86,7 @@ Mel-frequency cepstral coefficients (MFCCs) are coefficients that collectively m
 
 Relevant Papers:
 
-**na pasta articles encontram-se, numerados, os artigos aqui recomendados. Os outros foram recomendados pelos sistemas de biblioteca.**
+**Na pasta *articles* encontram-se, numerados, os artigos aqui recomendados. Os outros foram recomendados pelos sistemas online de biblioteca.**
 
 1) COLONNA, J. G.; CRISTO, M.; SALVATIERRA, M.; NAKAMURA, E. F. 
 An Incremental Technique for Real-Time Bioacoustic Signal Segmentation. 
