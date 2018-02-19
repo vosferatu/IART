@@ -17,7 +17,7 @@ Este projeto engloba os seguintes procedimentos:
 - Implementação/aplicação do algoritmo "Back-Propagation".
 
 - Medição detalhada de resultados nos dados de treino e de teste.
-t
+
 
 ***
 
