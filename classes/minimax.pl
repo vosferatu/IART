@@ -29,6 +29,7 @@ sucessor((N,min), min, (N1,max)) :- N>1, N1 is N-2.
 sucessor((N,min), min, (N1,max)) :- N>2, N1 is N-3.
 
 
+<<<<<<< HEAD
 max_value([E],P1,Valor,E) :-
    minimax(E,min,P1,Valor,_).
 
@@ -75,3 +76,37 @@ avalia((N,max),V) :-
 avalia((N,min),V) :-
   1 is N mod 4, !, V=1;
   V=0.
+=======
+% avaliação de estados
+
+minimax(E,max,Valor,Jogada) :- estado_final(E,Valor).
+
+minimax(E,max,Valor,Jogada) :-
+  findall(E2, sucessor(E,max,E2),LS),
+  max_value(LS,Valor,Jogada).
+  
+minimax(E,min,Valor,Jogada) :-
+  findall(E2, sucessor(E,min,E2),LS),
+  min_value(LS,Valor,Jogada).
+  
+ max_value([E],Valor,E) :-
+    minimax(E,min,Valor,_).
+    
+ max_value([E1|Es], MV, ME) :-
+   minimax(E1,min,V1,_),
+   max_value(Es, V2, E2).
+   (V1 > V2, !, MV=V1, ME=E1 ;
+   MV=V2, ME=E2).
+   
+  % "=" para valores, "is" para expressoes 
+   
+ min_value([E],Valor,E) :-
+    minimax(E,max,Valor,_).
+    
+ min_value([E1|Es], MV, ME) :-
+   minimax(E1,max,V1,_),
+   max_value(Es, V2, E2).
+   (V1 < V2, !, MV=V1, ME=E1 ;
+   MV=V2, ME=E2).
+  
+>>>>>>> bc45857136286a623bd1aad3ae13f527a2a4b047
