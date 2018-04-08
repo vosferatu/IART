@@ -54,8 +54,8 @@ namespace ANN
 	class pointer_wrapper
 	{
 	public:
-		Type() = default;
-		Type(Type * value) :
+		pointer_wrapper() = default;
+		pointer_wrapper(Type * value) :
 			_value(value)
 		{
 		}
@@ -67,8 +67,6 @@ namespace ANN
 	private:
 		Type * _value;
 	};
-
-	using double_ptr = pointer_wrapper<double>;
 
 	/***************************************************************************************************
 	***** NeuronCore ***********************************************************************************
@@ -94,28 +92,40 @@ namespace ANN
 		
 		void receive()
 		{
-			std::shared_lock<std::shared_mutex> lock(_lock);
+			std::shared_lock<std::shared_mutex> lock(_mutex);
 			while (_counter.load(std::memory_order_relaxed) < _limit)
 			{
-				_trigger.wait(lock);
+				_condition.wait(lock);
 			}
 		}
 		void send()
 		{
 			if (_counter.fetch_add(1, std::memory_order_relaxed) + 1 == _limit)
 			{
-				std::scoped_lock<std::shared_mutex> lock(_lock);
-				_trigger.notify_all();
+				std::scoped_lock<std::shared_mutex> lock(_mutex);
+				_condition.notify_all();
 			}
 		}
-		void clear()
+		void clear(bool active)
 		{
-			_counter.store(0, std::memory_order_relaxed);
+			_active.store(active, std::memory_order_relaxed);
+			_counter.store(!active * _limit, std::memory_order_relaxed);
+
+			if (!active)
+			{
+				std::scoped_lock<std::shared_mutex> lock(_mutex);
+				_condition.notify_all();
+			}
+		}
+		bool active()
+		{
+			return _active.load(std::memory_order_relaxed);
 		}
 	protected:
-		std::shared_mutex _lock;
-		std::condition_variable_any _trigger;
-		std::atomic_size_t _counter;
+		std::atomic_bool _active{ true };
+		std::shared_mutex _mutex;
+		std::condition_variable_any _condition;
+		std::atomic_size_t _counter{ 0 };
 		size_t _limit;
 	};
 
@@ -131,24 +141,33 @@ namespace ANN
 			_sender(sender)
 		{
 		}
+		Neuron(Neuron const & other) :
+			_receiver(other._receiver),
+			_sender(other._sender)
+		{
+		}
 
-		virtual void activation() = 0;
+		virtual void run() = 0;
+		virtual void stop() = 0;
+		virtual void _function() = 0;
 
 		NeuronCore & _receiver;
 		NeuronCore & _sender;
+		std::thread _neuron;
 	};
 
 	class SigmoidNeuron : public Neuron
 	{
+		using double_ptr = pointer_wrapper<double>;
 	public:
+		using value_type = double;
+		using reference_type = pointer_wrapper<double>;
+
 		SigmoidNeuron(size_t inputs, NeuronCore & receiver, NeuronCore & sender) : Neuron(receiver, sender),
-			_weights(inputs)
-		{
-		}
-		SigmoidNeuron(SigmoidNeuron const & other) : Neuron(other._receiver, other._sender),
-			_weights(other._weights.size()),
+			_weights(inputs),
 			_bias(GRG()),
-			_inputs(other._inputs)
+			_inputs(inputs),
+			_output(0.5)
 		{
 			std::generate(std::begin(_weights), std::end(_weights), std::ref(GRG));
 		}
@@ -161,14 +180,25 @@ namespace ANN
 		{
 			return _output;
 		}
-
-		void activation()
+		void run()
 		{
-			_receiver.receive();
-			_output = 1.0 / (1.0 + std::exp(-std::inner_product(std::begin(_inputs), std::end(_inputs), std::begin(_weights), 0.0) - _bias));
-			_sender.send();
+			_neuron = std::move(std::thread(&SigmoidNeuron::_function, this));
+		}
+		void stop()
+		{
+			_neuron.join();
 		}
 	private:
+		void _function()
+		{
+			while (_receiver.active())
+			{
+				_receiver.receive();
+				_output = 1.0 / (1.0 + std::exp(-std::inner_product(std::begin(_inputs), std::end(_inputs), std::begin(_weights), 0.0) - _bias));
+				_sender.send();
+			}
+		}
+
 		std::vector<double> _weights;
 		double _bias;
 		std::vector<double_ptr> _inputs;
@@ -182,7 +212,7 @@ namespace ANN
 	template <class NeuronType>
 	class NeuralNetwork
 	{
-		static_assert(std::is_base_of_v<Neuron, NeuronType>, "NeuronType must be a subclass of Neuron");
+		static_assert(std::is_base_of_v<Neuron, NeuronType>, "NeuronType must derive from Neuron");
 	public:
 		NeuralNetwork<NeuronType>(size_t inputs, std::initializer_list<size_t> layers) :
 			_neurons(layers.size() + 1),
@@ -190,22 +220,23 @@ namespace ANN
 			_inputs(inputs)
 		{
 			_neurons.at(0) = NeuronCore(1);
-			std::transform(std::begin(layers), std::end(layers), std::next(std::begin(_neurons)), 
+			std::transform(std::begin(layers), std::end(layers), std::next(std::begin(_neurons)),
 						   [] (size_t const & size) { return NeuronCore(size); });
-			
-			std::vector<double_ptr> inputs_ref(inputs);
+
+			std::vector<typename NeuronType::reference_type> inputs_ref(inputs);
 			std::transform(std::begin(_inputs), std::end(_inputs), std::begin(inputs_ref),
-						   [] (double & input) { return &input; });
+						   [] (typename NeuronType::value_type & input) { return &input; });
 
 			std::transform(std::begin(layers), std::end(layers), std::begin(_neurons), std::begin(_network),
-						   [&inputs_ref] (size_t const & layer_size, NeuronCore & neuron_core)
+						   [&inputs_ref, &inputs] (size_t const & layer_size, NeuronCore & neuron_core)
 			{
-				NeuronType neuron(layer_size, neuron_core, *(&neuron_core + 1));
+				NeuronType neuron(inputs, neuron_core, *(&neuron_core + 1));
 				neuron.ref_input(inputs_ref);
 
 				std::vector<NeuronType> layer(layer_size, neuron);
-				
-				inputs_ref = std::vector<double_ptr>(layer_size);
+
+				inputs = layer_size;
+				inputs_ref = std::vector<typename NeuronType::reference_type>(layer_size);
 				std::transform(std::begin(layer), std::end(layer), std::begin(inputs_ref),
 							   [] (NeuronType & neuron) { return &(neuron.output_ref()); });
 
@@ -213,16 +244,40 @@ namespace ANN
 			});
 
 			_outputs = inputs_ref;
+
+			std::for_each(std::begin(_network), std::end(_network), [] (std::vector<NeuronType> & neurons) 
+			{ 
+				std::for_each(std::begin(neurons), std::end(neurons), [] (NeuronType & neuron) 
+				{
+					neuron.run();
+				}); 
+			});
 		}
 
 		// TODO
 		// Training function
 		// Testing function
+
+		~NeuralNetwork<NeuronType>()
+		{
+			std::transform(std::begin(_network), std::end(_network), std::begin(_neurons), std::begin(_neurons),
+						   [] (std::vector<NeuronType> & neurons, NeuronCore & neuron_core)
+			{
+				neuron_core.clear(false);
+
+				std::for_each(std::begin(neurons), std::end(neurons), [] (NeuronType & neuron)
+				{
+					neuron.stop();
+				});
+
+				return neuron_core; // self assignment is NOOP
+			});
+		}
 	private:
 		std::vector<NeuronCore> _neurons;
 		std::vector<std::vector<NeuronType>> _network;
-		std::vector<double> _inputs;
-		std::vector<double_ptr> _outputs;
+		std::vector<typename NeuronType::value_type> _inputs;
+		std::vector<typename NeuronType::reference_type> _outputs;
 	};
 }
 
