@@ -1,14 +1,13 @@
 #ifndef NEURALNETWORK_HPP
 #define NEURALNETWORK_HPP
 
-#include <iostream>
 #include <array>
 #include <vector>
+#include <random>
 #include <numeric>
 #include <algorithm>
 #include <execution>
 #include <atomic>
-#include <random>
 
 namespace ANN
 {
