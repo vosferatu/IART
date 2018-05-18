@@ -4,7 +4,10 @@
 #include <iostream>
 #include <array>
 #include <vector>
+#include <execution>
+#include <optional>
 #include <numeric>
+#include <algorithm>
 #include <atomic>
 #include <random>
 #include <shared_mutex>
@@ -45,28 +48,6 @@ namespace ANN
 	std::array<std::mt19937::result_type, std::mt19937::state_size> GaussianRandomGenerator::_random_data;
 
 	inline GaussianRandomGenerator GRG;
-
-	/***************************************************************************************************
-	***** Pointer Wrapper ******************************************************************************
-	***************************************************************************************************/
-	
-	template <class Type>
-	class pointer_wrapper
-	{
-	public:
-		pointer_wrapper() = default;
-		pointer_wrapper(Type * value) :
-			_value(value)
-		{
-		}
-
-		operator Type()
-		{
-			return *_value;
-		}
-	private:
-		Type * _value;
-	};
 
 	/***************************************************************************************************
 	***** NeuronCore ***********************************************************************************
@@ -158,10 +139,10 @@ namespace ANN
 
 	class SigmoidNeuron : public Neuron
 	{
-		using double_ptr = pointer_wrapper<double>;
+		using double_ref = std::optional<std::reference_wrapper<double>>;
 	public:
 		using value_type = double;
-		using reference_type = pointer_wrapper<double>;
+		using reference_type = double_ref;
 
 		SigmoidNeuron(size_t inputs, NeuronCore & receiver, NeuronCore & sender) : Neuron(receiver, sender),
 			_weights(inputs),
@@ -172,7 +153,7 @@ namespace ANN
 			std::generate(std::begin(_weights), std::end(_weights), std::ref(GRG));
 		}
 
-		void ref_input(std::vector<double_ptr> inputs)
+		void ref_input(std::vector<double_ref> inputs)
 		{
 			_inputs = inputs;
 		}
@@ -189,7 +170,7 @@ namespace ANN
 			_neuron.join();
 		}
 	private:
-		void _function()
+		void _function() // Make this a public operator()
 		{
 			while (_receiver.active())
 			{
@@ -201,7 +182,7 @@ namespace ANN
 
 		std::vector<double> _weights;
 		double _bias;
-		std::vector<double_ptr> _inputs;
+		std::vector<double_ref> _inputs;
 		double _output;
 	};
 
