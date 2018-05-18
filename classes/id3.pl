@@ -75,3 +75,21 @@
 % OUTRAS FERRAMENTAS DO C4.5
 % INFORMAÇÃO DE SEPARAÇÃO
 % RAZÃO DO GANHO
+
+
+% First Iteration
+% entropy(emigra/idade): entropy([1/3, 2/3], _E1), _EE1 is entropy(_E1), entropy([2/5, 3/5], _E2), _EE2 is entropy(_E2), entropy([3/8, 5/8], [_EE1, _EE2], E).
+% entropy(emigra/nacionalidade): entropy([2/4, 2/4], _E1), _EE1 = entropy(_E1), entropy([1, 0], _E2), _EE2 = entropy(_E2), entropy([0, 1], _E3), _EE3 = entropy(_E3), entropy([4/8, 1/8, 3/8], [_EE1, _EE2, _EE3], E).
+% entropy(emigra/sit. familiar): entropy([3/5, 2/5], _E1), _EE1 = entropy(_E1), entropy([0, 1], _E2), _EE2 = entropy(_E2), entropy([5/8, 3/8], [_EE1, _EE2], E).
+
+entropy([], [], 0).
+entropy([C|CList],[entropy(CE)|CEList], E) :-
+    entropy(CList, CEList, ENext),
+    E is C * CE + ENext.
+
+entropy([], 0).
+entropy([0|CList], E) :-
+    entropy(CList, E).
+entropy([C|CList], E) :-
+    entropy(CList, ENext),
+    E is -C * log(2, C) + ENext.
