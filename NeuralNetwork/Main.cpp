@@ -11,7 +11,17 @@ struct Frog
 	std::string species;
 	std::string genus;
 	std::string family;
-	std::vector<double> MFCCs{std::vector<double>(22)};
+	std::vector<double> MFCCs{ std::vector<double>(22, 0.0) };
+	std::vector<double> taxonomy{ std::vector<double>(10, 0.0) };
+
+	std::vector<double> & input()
+	{
+		return MFCCs;
+	}
+	std::vector<double> & output()
+	{
+		return taxonomy;
+	}
 };
 
 std::vector<Frog> read_file()
@@ -29,6 +39,9 @@ std::vector<Frog> read_file()
 
 	file.close();
 
+	int species_index = -1;
+	std::string species_name = "";
+
 	auto data = std::begin(file_data);
 
 	for (std::string & string : file_string)
@@ -45,6 +58,8 @@ std::vector<Frog> read_file()
 		std::getline(stream, data->genus, ',');
 		std::getline(stream, data->species, ',');
 
+		data->taxonomy[species_name != data->species ? species_name = data->species, ++species_index : species_index] = 1.0;
+
 		stream >> data->ID;
 		stream.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
@@ -57,10 +72,14 @@ std::vector<Frog> read_file()
 // REQUIRES C++17
 int main()
 {
-	ANN::NeuralNetwork<ANN::SigmoidNeuron> ann(22, { 16, 10, 4, 8, 10 });
+	ANN::NeuralNetwork<Frog, ANN::Sigmoid, ANN::MeanSquared> ann({ 22, 16, 10, 4, 8, 10 }, 0.01);
 
 	std::vector<Frog> data = read_file();
 
+	std::cout << std::scientific << std::fixed;
+	std::cout.precision(6);
+
+	ann.train(data);
 	// TODO
 	// Evaluate results
 	// Output results
