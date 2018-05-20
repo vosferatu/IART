@@ -11,6 +11,8 @@
 
 namespace ANN
 {
+#define ANN_TMP_OPT
+
 	using double_ref = std::reference_wrapper<double>;
 
 	inline constexpr double INF = std::numeric_limits<double>::infinity();
@@ -31,6 +33,10 @@ namespace ANN
 		{
 		}
 
+		int uniform()
+		{
+			return _uniform(_engine);
+		}
 		double gaussian()
 		{
 			return _gaussian(_engine);
@@ -40,6 +46,7 @@ namespace ANN
 		std::array<std::mt19937_64::result_type, std::mt19937_64::state_size> _random_data{};
 		std::seed_seq _seeds;
 		std::mt19937_64 _engine;
+		std::uniform_int_distribution<int> _uniform;
 		std::normal_distribution<double> _gaussian;
 	};
 
@@ -86,7 +93,7 @@ namespace ANN
 		}
 		static double derivative(double a, double y)
 		{
-			return /*/ 2 * /**/ (a - y);
+			return a - y;
 		}
 		static std::vector<double> weight_derivative(std::vector<double> al, double e)
 		{
@@ -106,7 +113,7 @@ namespace ANN
 		static double derivative(double a, double y)
 		{
 			// Check this
-			return (a - y);
+			return a - y;
 		}
 		static std::vector<double> weight_derivative(std::vector<double> al, double a, double y)
 		{
@@ -241,15 +248,6 @@ namespace ANN
 		
 		void train(std::vector<DataType> & training_set)
 		{
-			_epoch(training_set);
-		}
-		void test(std::vector<DataType> & testing_set)
-		{
-
-		}
-	private:
-		void _epoch(std::vector<DataType> & set)
-		{
 			// Create weight deltas vectors
 			matrix<std::vector<double>> delta_weights(std::size(_network)); // Matrix of vectors of delta weights (vector per neuron, vector per layer, vector per network)
 
@@ -270,7 +268,7 @@ namespace ANN
 				return std::vector<double>(std::size(layer), 0.0);
 			});
 
-			std::for_each(std::execution::seq, std::begin(set), std::end(set), [&] (auto & example) {
+			std::for_each(std::execution::seq, std::begin(training_set), std::end(training_set), [&] (auto & example) {
 				// Initialize input vector
 				std::transform(std::execution::seq, std::begin(example.input()), std::end(example.input()), std::begin(_input), [&] (auto input) {
 					return input;
@@ -300,9 +298,10 @@ namespace ANN
 
 				// Feedforward
 				_feedforward(ActivationFunction(), act);
-				
+
 				--act;
 
+#ifdef ANN_DEBUG
 				std::vector<double> expected, actual;
 
 				std::cout << "Expected: ";
@@ -322,8 +321,8 @@ namespace ANN
 				std::cout << "\nCost: " << std::transform_reduce(std::execution::seq, std::begin(expected), std::end(expected), std::begin(actual), 0.0, std::plus<>(), [] (auto & expected, auto & actual) {
 					return CostFunction::function(actual, expected);
 				}) << "\n";
-				
-				
+#endif
+
 				// Backpropagate
 				_backpropagate(ActivationFunction(), CostFunction(), act, err, out);
 
@@ -333,23 +332,72 @@ namespace ANN
 				_update(CostFunction(), act, err, out, delta_weights, delta_biases);
 			});
 
+			// Teach
 			auto weights_layer = std::begin(delta_weights);
 			auto biases_layer = std::begin(delta_biases);
 			std::for_each(std::begin(_network), std::end(_network), [&] (auto & layer) {
 				auto weights_neuron = std::begin(*weights_layer);
 				auto biases_neuron = std::begin(*biases_layer);
 				std::for_each(std::begin(layer), std::end(layer), [&] (auto & neuron) {
-					neuron.learn(*weights_neuron++, *biases_neuron++, -_eta / std::size(set));
+					neuron.learn(*weights_neuron++, *biases_neuron++, -_eta / std::size(training_set));
 				});
 				++weights_layer;
 				++biases_layer;
 			});
 		}
+		void test(std::vector<DataType> & testing_set)
+		{
+			std::for_each(std::execution::seq, std::begin(testing_set), std::end(testing_set), [&] (auto & example) {
+				// Initialize input vector
+				std::transform(std::execution::seq, std::begin(example.input()), std::end(example.input()), std::begin(_input), [&] (auto input) {
+					return input;
+				});
 
+				// Create activation matrix
+				matrix<double> activation(std::size(_network) + 1);
+				auto act = std::begin(activation);
+
+				// Initialize activation matrix
+				*act++ = _input;
+				std::transform(std::execution::seq, std::begin(_network), std::end(_network), act, [] (auto & neurons) {
+					return std::vector<double>(std::size(neurons));
+				});
+
+				// Feedforward
+				_feedforward(ActivationFunction(), act);
+
+#ifdef ANN_DEBUG
+				std::vector<double> expected, actual;
+
+				std::cout << "Expected: ";
+				for (auto & output : example.output())
+				{
+					std::cout << output << " ";
+					expected.emplace_back(output);
+				}
+
+				std::cout << "\nActual: ";
+				for (auto & output : activation.back())
+				{
+					std::cout << output << " ";
+					actual.emplace_back(output);
+				}
+
+				std::cout << "\nCost: " << std::transform_reduce(std::execution::seq, std::begin(expected), std::end(expected), std::begin(actual), 0.0, std::plus<>(), [] (auto & expected, auto & actual) {
+					return CostFunction::function(actual, expected);
+				}) << "\n";
+#endif
+			});
+		}
+	private:
 		template <class Iterator>
 		void _feedforward(Sigmoid, Iterator & act)
 		{
+#ifdef ANN_TMP_OPT
+			std::for_each(std::execution::seq, std::begin(_network), std::prev(std::end(_network)), [&] (auto & layer) {
+#else
 			std::for_each(std::execution::seq, std::begin(_network), std::end(_network), [&] (auto & layer) {
+#endif
 				std::transform(std::execution::seq, std::begin(layer), std::end(layer), std::begin(*act++), [&] (auto & neuron) { // par
 					// Calculate weighted_input
 					neuron.calculate();
@@ -358,11 +406,18 @@ namespace ANN
 					return neuron.feedforward(Sigmoid());
 				});
 			});
+#ifdef ANN_TMP_OPT
+			_feedforward(Softmax(), act);
+#endif
 		}
 		template <class Iterator>
 		void _feedforward(Softmax, Iterator & act)
 		{
+#ifdef ANN_TMP_OPT
+			std::for_each(std::execution::seq, std::prev(std::end(_network)), std::end(_network), [&] (auto & layer) {
+#else
 			std::for_each(std::execution::seq, std::begin(_network), std::end(_network), [&] (auto & layer) {
+#endif
 				std::vector<double> weighted_inputs(std::size(layer));
 
 				std::transform(std::execution::seq, std::begin(layer), std::end(layer), std::begin(weighted_inputs), [&] (auto & neuron) {
@@ -383,6 +438,11 @@ namespace ANN
 		template <class Iterator1, class Iterator2, class Iterator3>
 		void _backpropagate(Sigmoid, MeanSquared, Iterator1 & act, Iterator2 & err, Iterator3 & out)
 		{
+#ifdef ANN_TMP_OPT
+			std::vector<double> gradient = _backpropagate(Softmax(), LogLikelihood(), act, err, out);
+
+			std::for_each(std::execution::seq, std::next(std::rbegin(_network)), std::rend(_network), [&] (auto & layer) {
+#else
 			// Create gradient vector and calculate gradient for output layer
 			std::vector<double> gradient(std::size(_network.back()));
 			std::transform(std::execution::seq, std::begin(*act), std::end(*act), out, std::begin(gradient), [&] (auto & actual, auto & expected) {
@@ -390,6 +450,7 @@ namespace ANN
 			});
 
 			std::for_each(std::execution::seq, std::rbegin(_network), std::rend(_network), [&] (auto & layer) {
+#endif
 				--act;
 
 				// Create transposed weight matrix
@@ -420,7 +481,11 @@ namespace ANN
 			});
 		}
 		template <class Iterator1, class Iterator2, class Iterator3>
+#ifdef ANN_TMP_OPT
+		std::vector<double> _backpropagate(Softmax, LogLikelihood, Iterator1 & act, Iterator2 & err, Iterator3 & out)
+#else
 		void _backpropagate(Softmax, LogLikelihood, Iterator1 & act, Iterator2 & err, Iterator3 & out)
+#endif
 		{
 			// Create gradient vector and calculate gradient for output layer
 			std::vector<double> gradient(std::size(_network.back()));
@@ -428,7 +493,11 @@ namespace ANN
 				return LogLikelihood::derivative(actual, expected);
 			});
 
+#ifdef ANN_TMP_OPT
+			std::for_each(std::execution::seq, std::rbegin(_network), std::next(std::rbegin(_network)), [&] (auto & layer) {
+#else
 			std::for_each(std::execution::seq, std::rbegin(_network), std::rend(_network), [&] (auto & layer) {
+#endif
 				--act;
 
 				// Create transposed weight matrix
@@ -457,16 +526,24 @@ namespace ANN
 
 				++err;
 			});
+#ifdef ANN_TMP_OPT
+			return gradient;
+#endif
 		}
 
 		template <class Iterator1, class Iterator2, class Iterator3>
 		void _update(MeanSquared, Iterator1 & act, Iterator2 & err, [[maybe_unused]] Iterator3 & out, matrix<std::vector<double>> & weights, matrix<double> & biases)
 		{
+#ifdef ANN_TMP_OPT
+			std::transform(std::execution::seq, std::begin(weights), std::prev(std::end(weights)), act, std::begin(weights), [&] (auto & layer, auto & activation) {
+				++act;
+#else
 			// Calculate delta weight for this layer
-			std::transform(std::execution::seq, std::begin(weights), std::end(weights), act++, std::begin(weights), [&] (auto & layer, auto & activation) {
+			std::transform(std::execution::seq, std::begin(weights), std::end(weights), act, std::begin(weights), [&] (auto & layer, auto & activation) {
+#endif
 				matrix<double> delta(std::size(layer));
-				std::transform(std::execution::seq, std::begin(layer), std::end(layer), std::begin(*err), std::begin(delta), [&] (auto & neuron, auto & error) {
-					std::vector<double> delta = MeanSquared::weight_derivative(activation, error);
+				std::transform(std::execution::seq, std::begin(layer), std::end(layer), std::begin(*err), std::begin(delta), [&] (auto & neuron, auto & e) {
+					std::vector<double> delta = MeanSquared::weight_derivative(activation, e);
 					std::transform(std::execution::seq, std::begin(neuron), std::end(neuron), std::begin(delta), std::begin(delta), [] (auto & weight, auto & delta) {
 						return weight + delta;
 					});
@@ -477,21 +554,33 @@ namespace ANN
 			
 			++err;
 
+#ifdef ANN_TMP_OPT
+			std::for_each(std::execution::seq, std::begin(biases), std::prev(std::end(biases)), [&] (auto & neuron) {
+#else
 			// Calculate delta bias for this layer
 			std::for_each(std::execution::seq, std::begin(biases), std::end(biases), [&] (auto & neuron) {
+#endif
 				std::transform(std::execution::seq, std::begin(neuron), std::end(neuron), std::begin(*--err), std::begin(neuron), [] (auto & bias, auto & error) {
 					return bias + MeanSquared::bias_derivative(error);
 				});
 			});
+
+#ifdef ANN_TMP_OPT
+			_update(LogLikelihood(), act, err, out, weights, biases);
+#endif
 		}
 		template <class Iterator1, class Iterator2, class Iterator3>
 		void _update(LogLikelihood, Iterator1 & act, [[maybe_unused]] Iterator2 & err, Iterator3 & out, matrix<std::vector<double>> & weights, matrix<double> & biases)
 		{
+#ifdef ANN_TMP_OPT
+			std::transform(std::execution::seq, std::prev(std::end(weights)), std::end(weights), act++, std::prev(std::end(weights)), [&] (auto & layer, auto & activation) {
+#else
 			// Calculate delta weight for this layer
-			std::transform(std::execution::seq, std::begin(weights), std::end(weights), std::begin(weights), [&] (auto & layer) {
+			std::transform(std::execution::seq, std::begin(weights), std::end(weights), act++, std::begin(weights), [&] (auto & layer, auto & activation) {
+#endif
 				matrix<double> delta(std::size(layer));
-				std::transform(std::execution::seq, std::begin(layer), std::end(layer), std::begin(delta), [&] (auto & neuron) {
-					std::vector<double> delta = LogLikelihood::weight_derivative(*act, *(act + 1), *out);
+				std::transform(std::execution::seq, std::begin(layer), std::end(layer), std::begin(*act), std::begin(delta), [&] (auto & neuron, auto & a) {
+					std::vector<double> delta = LogLikelihood::weight_derivative(activation, a, *out);
 					std::transform(std::execution::seq, std::begin(neuron), std::end(neuron), std::begin(delta), std::begin(delta), [] (auto & weight, auto & delta) {
 						return weight + delta;
 					});
@@ -499,13 +588,15 @@ namespace ANN
 				});
 				return delta;
 			});
-			
-			++err;
 
+#ifdef ANN_TMP_OPT
+			std::for_each(std::execution::seq, std::prev(std::end(biases)), std::end(biases), [&] (auto & neuron) {
+#else
 			// Calculate delta bias for this layer
 			std::for_each(std::execution::seq, std::begin(biases), std::end(biases), [&] (auto & neuron) {
-				std::transform(std::execution::seq, std::begin(neuron), std::end(neuron), std::begin(neuron), [] (auto & bias) {
-					return bias + LogLikelihood::bias_derivative(*act++, *out++);
+#endif
+				std::transform(std::execution::seq, std::begin(neuron), std::end(neuron), std::begin(neuron), std::begin(*act), [&] (auto & bias, auto & a) {
+					return bias + LogLikelihood::bias_derivative(a, *out++);
 				});
 			});
 		}

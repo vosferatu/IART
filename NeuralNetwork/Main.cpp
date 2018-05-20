@@ -3,6 +3,7 @@
 #include <sstream>
 #include <string>
 
+#define ANN_DEBUG
 #include "NeuralNetwork.hpp"
 
 struct Frog
@@ -13,6 +14,7 @@ struct Frog
 	std::string family;
 	std::vector<double> MFCCs{ std::vector<double>(22, 0.0) };
 	std::vector<double> taxonomy{ std::vector<double>(10, 0.0) };
+	bool target{ false };
 
 	std::vector<double> & input()
 	{
@@ -21,6 +23,15 @@ struct Frog
 	std::vector<double> & output()
 	{
 		return taxonomy;
+	}
+
+	bool operator==(Frog const & other)
+	{
+		return ID == other.ID;
+	}
+	bool operator!=(Frog const & other)
+	{
+		return ID != other.ID;
 	}
 };
 
@@ -72,14 +83,33 @@ std::vector<Frog> read_file()
 // REQUIRES C++17
 int main()
 {
+	std::ios_base::sync_with_stdio(false);
+	std::cout << std::scientific << std::fixed;
+	std::cout.precision(9);
+
 	ANN::NeuralNetwork<Frog, ANN::Sigmoid, ANN::MeanSquared> ann({ 22, 16, 10, 4, 8, 10 }, 0.5);
 
 	std::vector<Frog> data = read_file();
 
-	std::cout << std::scientific << std::fixed;
-	std::cout.precision(9);
+//	std::shuffle(std::begin(data), std::end(data), [] { return ANN::RNG.uniform(); }); // Shuffle, pretty self-explanatory
+	
+	std::vector<Frog> testing_set(std::size(data));
+	std::vector<Frog> training_set(std::size(data));
+	
+	auto range = std::partition_copy(std::begin(data), std::end(data), std::begin(testing_set), std::begin(training_set), [&] (auto & frog) { return data.front() == frog; }); // Leave-one-out CV
+	testing_set.erase(range.first, std::end(testing_set));
+	training_set.erase(range.second, std::end(training_set));
 
-	ann.train(data);
+	std::for_each(std::begin(training_set), std::end(training_set), [&] (auto & frog) { frog.target = testing_set.front().species == frog.species; });
+
+//	std::shuffle(std::begin(testing_set), std::end(testing_set), [] { return ANN::RNG.uniform(); });
+//	std::shuffle(std::begin(training_set), std::end(training_set), [] { return ANN::RNG.uniform(); });
+
+	for (;;)
+	{
+		ann.train(training_set);
+	//	ann.test(testing_set);
+	}
 
 	// TODO
 	// Evaluate results
