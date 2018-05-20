@@ -72,14 +72,15 @@ std::vector<Frog> read_file()
 // REQUIRES C++17
 int main()
 {
-	ANN::NeuralNetwork<Frog, ANN::Sigmoid, ANN::MeanSquared> ann({ 22, 16, 10, 4, 8, 10 }, 0.01);
+	ANN::NeuralNetwork<Frog, ANN::Sigmoid, ANN::MeanSquared> ann({ 22, 16, 10, 4, 8, 10 }, 0.5);
 
 	std::vector<Frog> data = read_file();
 
 	std::cout << std::scientific << std::fixed;
-	std::cout.precision(6);
+	std::cout.precision(9);
 
 	ann.train(data);
+
 	// TODO
 	// Evaluate results
 	// Output results
