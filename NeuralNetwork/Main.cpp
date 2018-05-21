@@ -4,10 +4,7 @@
 #include <string>
 
 // #define ANN_DEBUG
-#pragma warning(disable:4244)
 #include "NeuralNetwork.hpp"
-#include "mnist/mnist_reader_less.hpp"
-#include "mnist/mnist_utils.hpp"
 
 struct Frog
 {
@@ -90,42 +87,32 @@ int main()
 	std::cout << std::scientific << std::fixed;
 	std::cout.precision(9);
 
-	auto dataset = mnist::read_dataset<uint8_t, uint8_t>();
-	normalize_dataset(dataset);
+	ANN::NeuralNetwork<Frog, ANN::Sigmoid, ANN::MeanSquared> ann({ 22, 32, 32, 32, 16, 10 }, 0.1);
 
- 	auto mnist_testing_set = mnist::create_MNIST_testing_set(dataset);
-	auto mnist_training_set = mnist::create_MNIST_training_set(dataset);
+	std::vector<Frog> data = read_file();
 
-	ANN::NeuralNetwork<mnist::MNIST, ANN::Sigmoid, ANN::MeanSquared> ann({ 784, 30, 10 }, 0.1);
-
-//	std::vector<Frog> data = read_file();
-
-//	std::shuffle(std::begin(data), std::end(data), [] { return ANN::RNG.uniform(); }); // Shuffle, pretty self-explanatory
+	std::shuffle(std::begin(data), std::end(data), ANN::RNG());
 	
-/*	std::vector<Frog> testing_set(std::size(data));
+	std::vector<Frog> testing_set(std::size(data));
 	std::vector<Frog> training_set(std::size(data));
 	
 	auto range = std::partition_copy(std::begin(data), std::end(data), std::begin(testing_set), std::begin(training_set), [&] (auto & frog) { return data.front() == frog; }); // Leave-one-out CV
 	testing_set.erase(range.first, std::end(testing_set));
 	training_set.erase(range.second, std::end(training_set));
 
-	std::for_each(std::begin(training_set), std::end(training_set), [&] (auto & frog) { frog.target = testing_set.front().species == frog.species; }); */
+	std::for_each(std::begin(training_set), std::end(training_set), [&] (auto & frog) { frog.target = testing_set.front().species == frog.species; });
 
-//	std::shuffle(std::begin(testing_set), std::end(testing_set), [] { return ANN::RNG.uniform(); });
-//	std::shuffle(std::begin(training_set), std::end(training_set), [] { return ANN::RNG.uniform(); });
+	std::shuffle(std::begin(testing_set), std::end(testing_set), ANN::RNG());
+	std::shuffle(std::begin(training_set), std::end(training_set), ANN::RNG());
 
 	for (auto n = 0; n < 100; ++n)
 	{
 		std::cout << "Epoch: " << n << "\n";
-		ann.train(mnist_training_set);
-		ann.test(mnist_testing_set);
-		std::shuffle(std::begin(mnist_testing_set), std::end(mnist_testing_set), ANN::RNG());
-		std::shuffle(std::begin(mnist_training_set), std::end(mnist_training_set), ANN::RNG());
+		ann.train(training_set);
+		ann.test(testing_set);
+		std::shuffle(std::begin(testing_set), std::end(testing_set), ANN::RNG());
+		std::shuffle(std::begin(training_set), std::end(training_set), ANN::RNG());
 	}
-
-	// TODO
-	// Evaluate results
-	// Output results
 
 	return 0;
 }
