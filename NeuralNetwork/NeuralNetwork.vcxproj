@@ -143,6 +143,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="mnist\mnist_reader.hpp" />
+    <ClInclude Include="mnist\mnist_reader_common.hpp" />
+    <ClInclude Include="mnist\mnist_reader_less.hpp" />
+    <ClInclude Include="mnist\mnist_utils.hpp" />
     <ClInclude Include="NeuralNetwork.hpp" />
   </ItemGroup>
   <ItemGroup>

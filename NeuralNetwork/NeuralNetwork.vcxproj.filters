@@ -18,6 +18,18 @@
     <ClInclude Include="NeuralNetwork.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="mnist\mnist_reader.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mnist\mnist_reader_common.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mnist\mnist_reader_less.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mnist\mnist_utils.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">

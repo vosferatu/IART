@@ -41,6 +41,10 @@ namespace ANN
 		{
 			return _gaussian(_engine);
 		}
+		std::mt19937_64 & operator()()
+		{
+			return _engine;
+		}
 	private:
 		std::random_device _random_device{};
 		std::array<std::mt19937_64::result_type, std::mt19937_64::state_size> _random_data{};
@@ -110,6 +114,10 @@ namespace ANN
 
 	struct LogLikelihood
 	{
+		static double function(double a)
+		{
+			return -std::log(a);
+		}
 		static double derivative(double a, double y)
 		{
 			// Check this
@@ -163,6 +171,7 @@ namespace ANN
 		{
 			return _output = Softmax::function(_weighted_input, weighted_inputs);
 		}
+
 		double backpropagate(Sigmoid, double gradient)
 		{
 			return _error = gradient * Sigmoid::derivative(_weighted_input);
@@ -318,8 +327,8 @@ namespace ANN
 					actual.emplace_back(output);
 				}
 
-				std::cout << "\nCost: " << std::transform_reduce(std::execution::seq, std::begin(expected), std::end(expected), std::begin(actual), 0.0, std::plus<>(), [] (auto & expected, auto & actual) {
-					return CostFunction::function(actual, expected);
+				std::cout << "\nCost: " << std::transform_reduce(std::execution::seq, std::begin(actual), std::end(actual), 0.0, std::plus<>(), [] (auto & actual) {
+					return LogLikelihood::function(actual);
 				}) << "\n";
 #endif
 
@@ -347,6 +356,8 @@ namespace ANN
 		}
 		void test(std::vector<DataType> & testing_set)
 		{
+			total = count = 0;
+
 			std::for_each(std::execution::seq, std::begin(testing_set), std::end(testing_set), [&] (auto & example) {
 				// Initialize input vector
 				std::transform(std::execution::seq, std::begin(example.input()), std::end(example.input()), std::begin(_input), [&] (auto input) {
@@ -366,6 +377,17 @@ namespace ANN
 				// Feedforward
 				_feedforward(ActivationFunction(), act);
 
+				--act;
+
+				if (auto n = std::distance(std::find_if(std::begin(*act), std::end(*act), [] (auto & actual) { return actual >= 0.5; }), std::end(*act)))
+				{
+					if (example.output().at(n))
+					{
+						++count;
+					}
+				}
+				++total;
+
 #ifdef ANN_DEBUG
 				std::vector<double> expected, actual;
 
@@ -383,11 +405,13 @@ namespace ANN
 					actual.emplace_back(output);
 				}
 
-				std::cout << "\nCost: " << std::transform_reduce(std::execution::seq, std::begin(expected), std::end(expected), std::begin(actual), 0.0, std::plus<>(), [] (auto & expected, auto & actual) {
-					return CostFunction::function(actual, expected);
+				std::cout << "\nCost: " << std::transform_reduce(std::execution::seq, std::begin(actual), std::end(actual), 0.0, std::plus<>(), [] (auto & actual) {
+					return LogLikelihood::function(actual);
 				}) << "\n";
 #endif
 			});
+
+			std::cout << "Accuracy: " << count / total << "\n";
 		}
 	private:
 		template <class Iterator>
@@ -468,7 +492,10 @@ namespace ANN
 						transpose_weights.at(idx2++).at(idx1) = value;
 					});
 
-					return neuron.backpropagate(Sigmoid(), gradient.at(idx1));
+					auto error = neuron.backpropagate(Sigmoid(), gradient.at(idx1));
+					neuron.clear();
+
+					return error;
 				});
 
 				// Calculate gradient for previous layer
@@ -515,7 +542,10 @@ namespace ANN
 						transpose_weights.at(idx2++).at(idx1) = value;
 					});
 
-					return neuron.backpropagate(Softmax(), gradient.at(idx1));
+					auto error = neuron.backpropagate(Softmax(), gradient.at(idx1));
+					neuron.clear();
+
+					return error;
 				});
 
 				// Calculate gradient for previous layer
@@ -615,6 +645,9 @@ namespace ANN
 
 			return matrix;
 		}
+
+		double count;
+		double total;
 
 		double _eta;
 		std::vector<double> _input;
