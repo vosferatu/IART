@@ -27,10 +27,15 @@ _CSV_COLUMN_DEFAULTS = [[0.], [0.], [0.], [0.], [0.],
                         [0.], [0.],
                         [0]]
 
+PARAM_NUM = 22
+BATCH_SIZE = 201
+NUM_EPOCHSs = 201
+DIV = 50
+
 def parse_csv(line):
     record_defaults=_CSV_COLUMN_DEFAULTS
     parsed_line = tf.decode_csv(line, record_defaults)
-    features = tf.reshape(parsed_line[:-1], shape=(22,))
+    features = tf.reshape(parsed_line[:-1], shape=(PARAM_NUM,))
     label = tf.reshape(parsed_line[-1], shape=())
     return features, label
 
@@ -40,12 +45,12 @@ test_dataset_fp = os.path.abspath("test.csv")
 train_dataset = tf.data.TextLineDataset(train_dataset_fp)
 train_dataset = train_dataset.map(parse_csv)      # parse each row
 train_dataset = train_dataset.shuffle(buffer_size=1000)  # randomize
-train_dataset = train_dataset.batch(150)
+train_dataset = train_dataset.batch(BATCH_SIZE)
 
 test_dataset = tf.data.TextLineDataset(test_dataset_fp)
 test_dataset = test_dataset.map(parse_csv)      # parse each row
 test_dataset = test_dataset.shuffle(buffer_size=1000)  # randomize
-test_dataset = test_dataset.batch(201)
+test_dataset = test_dataset.batch(BATCH_SIZE)
 
 
 print("\nTrain Set:")
@@ -65,7 +70,7 @@ print("\n")
 # overfitting -> "memorizing" answers
 
 model = tf.keras.Sequential([
-  tf.keras.layers.Dense(36, activation="relu", input_shape=(22,)),  # input shape required
+  tf.keras.layers.Dense(36, activation="relu", input_shape=(PARAM_NUM,)),  # input shape required
   tf.keras.layers.Dense(28, activation="relu"),
   tf.keras.layers.Dense(16, activation="relu"),
   tf.keras.layers.Dense(10)
@@ -90,9 +95,7 @@ optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.01)
 train_loss_results = []
 train_accuracy_results = []
 
-num_epochs = 201
-
-for epoch in range(num_epochs):
+for epoch in range(NUM_EPOCHS):
   epoch_loss_avg = tfe.metrics.Mean()
   epoch_accuracy = tfe.metrics.Accuracy()
 
@@ -112,7 +115,7 @@ for epoch in range(num_epochs):
   train_loss_results.append(epoch_loss_avg.result())
   train_accuracy_results.append(epoch_accuracy.result())
 
-  if epoch % 50 == 0:
+  if epoch % DIV == 0:
     print("Epoch {:03d}: Loss: {:.3f}, Accuracy: {:.3%}".format(epoch,
                                                                 epoch_loss_avg.result(),
                                                                 epoch_accuracy.result()))
