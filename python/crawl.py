@@ -29,7 +29,7 @@ _CSV_COLUMN_DEFAULTS = [[0.], [0.], [0.], [0.], [0.],
 
 PARAM_NUM = 22
 BATCH_SIZE = 201
-NUM_EPOCHSs = 201
+NUM_EPOCHS = 201
 DIV = 50
 
 def parse_csv(line):
